@@ -34,6 +34,9 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
+// In-memory OTP store (Use Redis for PRODUCTION with multiple instances)
+const otpStore = {};
+
 const PORT = process.env.PORT || 10000;
 
 app.get('/', (req, res) => {
@@ -55,23 +58,58 @@ app.post('/send-telegram-otp', async (req, res) => {
 
         const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
 
+        // Store OTP with 5-minute expiry
+        otpStore[phone] = {
+            code: generatedOtp,
+            expires: Date.now() + 5 * 60 * 1000
+        };
+
         await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN.trim()}/sendMessage`, {
             chat_id: process.env.TELEGRAM_CHAT_ID,
             text: `كود تفعيل وصلني للرقم ${phone} هو: ${generatedOtp}`
         });
 
-        let customToken = null;
-        try {
-            customToken = await admin.auth().createCustomToken(phone);
-        } catch (tokenError) {
-            console.error("Token Generation Error:", tokenError.message);
-            throw new Error("Failed to generate Firebase token");
+        // SECURITY: DO NOT return the OTP or token here!
+        res.json({
+            success: true,
+            message: "تم إرسال الكود بنجاح عبر تيليجرام"
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+app.post('/verify-telegram-otp', async (req, res) => {
+    const { phone, otp } = req.body;
+
+    try {
+        const record = otpStore[phone];
+
+        if (!record) {
+            return res.status(400).json({ success: false, error: "لم يتم العثور على كود لهذا الرقم" });
         }
+
+        if (Date.now() > record.expires) {
+            delete otpStore[phone];
+            return res.status(400).json({ success: false, error: "انتهت صلاحية الكود" });
+        }
+
+        if (String(record.code) !== String(otp)) {
+            return res.status(400).json({ success: false, error: "كود التحقق غير صحيح" });
+        }
+
+        // Success! Generate token now
+        const customToken = await admin.auth().createCustomToken(phone);
+        
+        // Clean up
+        delete otpStore[phone];
 
         res.json({
             success: true,
-            message: "تم الإرسال بنجاح!",
-            otp: generatedOtp,
             customToken: customToken
         });
 
