@@ -1,15 +1,10 @@
 const express = require("express");
 const cors = require("cors");
-const admin = require("firebase-admin");
 const axios = require("axios");
 const cron = require("node-cron");
 
 // Initialize Firebase Admin
-if (admin.apps.length === 0) {
-    admin.initializeApp();
-}
 
-const db = admin.firestore();
 const auth = admin.auth();
 
 const app = express();
