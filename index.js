@@ -1,16 +1,18 @@
 const express = require('express');
 const cors = require('cors');
-const admin = require('firebase-admin'); // <--- السطر ده هو اللي ناقصك ومسبب المشكلة
+const admin = require('firebase-admin');
 const axios = require('axios');
 
 const app = express();
-app.use(cors());
+
+// إعدادات الـ CORS والـ JSON (مرة واحدة فقط)
+app.use(cors({ origin: true }));
 app.use(express.json());
 
 // تعريف وتشغيل Firebase Admin
 if (admin.apps.length === 0) {
     admin.initializeApp({
-        projectId: "waslny-e9da9" // الـ ID بتاع مشروعك
+        projectId: "waslny-e9da9" 
     });
 }
 
