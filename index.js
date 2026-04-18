@@ -1,11 +1,21 @@
-const express = require("express");
-const cors = require("cors");
-const axios = require("axios");
-const cron = require("node-cron");
+const express = require('express');
+const cors = require('cors');
+const admin = require('firebase-admin'); // <--- السطر ده هو اللي ناقصك ومسبب المشكلة
+const axios = require('axios');
 
-// Initialize Firebase Admin
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// تعريف وتشغيل Firebase Admin
+if (admin.apps.length === 0) {
+    admin.initializeApp({
+        projectId: "waslny-e9da9" // الـ ID بتاع مشروعك
+    });
+}
 
 const auth = admin.auth();
+const db = admin.firestore();
 
 const app = express();
 app.use(cors({ origin: true }));
