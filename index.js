@@ -27,22 +27,22 @@ app.post('/send-telegram-otp', async (req, res) => {
         }
 
         // تجربة إرسال بسيطة لتيليجرام
-        const telegramResponse = await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`, {
-            chat_id: "ضغ_هنا_ايدي_حسابك", 
-            text: `كود تفعيل وصلني للرقم ${phone} هو: 1234`
+        const telegramResponse = await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN.trim()}/sendMessage`, {
+            chat_id: process.env.TELEGRAM_CHAT_ID, // ضيف ده في Render برضه
+            text: `كود تفعيل وصلني للرقم ${phone} هو: ${Math.floor(1000 + Math.random() * 9000)}`
         });
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: "تم الإرسال بنجاح!",
             telegram_info: telegramResponse.data
         });
     } catch (error) {
         console.error("❌ حصلت مشكلة:");
         console.error(error.response ? error.response.data : error.message);
-        
-        res.status(500).json({ 
-            success: false, 
+
+        res.status(500).json({
+            success: false,
             error: error.message,
             details: error.response ? error.response.data : "No extra details"
         });
