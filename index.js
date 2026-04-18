@@ -34,8 +34,8 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-// In-memory OTP store (Use Redis for PRODUCTION with multiple instances)
-const otpStore = {};
+// Initialize Firestore
+const db = admin.firestore();
 
 const PORT = process.env.PORT || 10000;
 
@@ -58,18 +58,17 @@ app.post('/send-telegram-otp', async (req, res) => {
 
         const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
 
-        // Store OTP with 5-minute expiry
-        otpStore[phone] = {
+        // 🔥 Store OTP in Firestore with 5-minute expiry
+        await db.collection('otps').doc(phone).set({
             code: generatedOtp,
             expires: Date.now() + 5 * 60 * 1000
-        };
+        });
 
         await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN.trim()}/sendMessage`, {
             chat_id: process.env.TELEGRAM_CHAT_ID,
             text: `كود تفعيل وصلني للرقم ${phone} هو: ${generatedOtp}`
         });
 
-        // SECURITY: DO NOT return the OTP or token here!
         res.json({
             success: true,
             message: "تم إرسال الكود بنجاح عبر تيليجرام"
@@ -84,29 +83,35 @@ app.post('/send-telegram-otp', async (req, res) => {
 });
 
 app.post('/verify-telegram-otp', async (req, res) => {
-    const { phone, otp } = req.body;
+    const { phone, code } = req.body; // Using 'code' instead of 'otp' as requested
 
     try {
-        const record = otpStore[phone];
-
-        if (!record) {
-            return res.status(400).json({ success: false, error: "لم يتم العثور على كود لهذا الرقم" });
+        if (!phone || !code) {
+          return res.status(400).json({ success: false, error: "رقم الهاتف والكود مطلوبان" });
         }
 
-        if (Date.now() > record.expires) {
-            delete otpStore[phone];
-            return res.status(400).json({ success: false, error: "انتهت صلاحية الكود" });
+        const doc = await db.collection('otps').doc(phone).get();
+
+        if (!doc.exists) {
+            return res.json({ success: false, error: "لم يتم العثور على كود لهذا الرقم" });
         }
 
-        if (String(record.code) !== String(otp)) {
-            return res.status(400).json({ success: false, error: "كود التحقق غير صحيح" });
+        const data = doc.data();
+
+        if (Date.now() > data.expires) {
+            await db.collection('otps').doc(phone).delete();
+            return res.json({ success: false, error: "انتهت صلاحية الكود" });
+        }
+
+        if (String(data.code) !== String(code)) {
+            return res.json({ success: false, error: "كود التحقق غير صحيح" });
         }
 
         // Success! Generate token now
         const customToken = await admin.auth().createCustomToken(phone);
         
         // Clean up
-        delete otpStore[phone];
+        await db.collection('otps').doc(phone).delete();
 
         res.json({
             success: true,
