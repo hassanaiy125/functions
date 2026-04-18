@@ -61,14 +61,21 @@ function generateOTP() {
  * TELEGRAM OTP
  */
 app.post('/send-telegram-otp', async (req, res) => {
+    const { phone } = req.body;
+    console.log("إرسال كود للرقم:", phone);
+
     try {
-        const { phone } = req.body;
-        console.log("Request for phone:", phone);
         if (!phone) return res.send({ success: false, error: "Phone number required" });
+
+        // تأكد أنك عرفت TELEGRAM_TOKEN في Render Environment
+        if (!process.env.TELEGRAM_TOKEN) {
+            throw new Error("التوكن بتاع تليجرام مش موجود في إعدادات ريندر");
+        }
 
         const requestId = "tg_" + Math.random().toString(36).substring(7);
         const otp = generateOTP();
         
+        // حفظ الكود في الداتابيز عشان الأبلكيشن يعرف يقرأه
         await db.collection("otps").doc(phone).set({
             otp: otp,
             requestId: requestId,
@@ -76,10 +83,31 @@ app.post('/send-telegram-otp', async (req, res) => {
             expiresAt: new Date(Date.now() + 5 * 60000)
         });
 
-        console.log(`[SIMULATION] Telegram OTP ${otp} for ${phone}`);
-        res.json({ success: true, requestId, message: "OTP endpoint reached successfully" });
+        // تجربة إرسال بسيطة لتيليجرام (يفضل وضع ID حقيقي هنا)
+        const telegramResponse = await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`, {
+            chat_id: "ضغ_هنا_ايدي_حسابك", 
+            text: `كود تفعيل وصلني للرقم ${phone} هو: ${otp}`
+        }).catch(err => {
+            console.warn("⚠️ مشكلة في إرسال رسالة التيليجرام (غالباً بسبب الـ Chat ID أو الـ Token)");
+            return { data: { error: err.message } };
+        });
+
+        res.json({ 
+            success: true, 
+            requestId,
+            message: "تم الإرسال بنجاح (سيتم استلام الكود في الأبلكيشن)",
+            telegram_info: telegramResponse.data
+        });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        // السطرين دول هيطلعوا لك "السبب" في الـ Logs بلون واضح
+        console.error("❌ حصلت مشكلة هنا:");
+        console.error(error.response ? error.response.data : error.message);
+        
+        res.status(500).json({ 
+            success: false, 
+            error: error.message,
+            details: error.response ? error.response.data : "No extra details"
+        });
     }
 });
 
