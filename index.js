@@ -4,16 +4,6 @@ const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https")
 const { onSchedule } = require("firebase-functions/v2/scheduler"); 
 const admin = require("firebase-admin");
 const axios = require("axios");
-const twilio = require("twilio");
-
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-if (!accountSid || !authToken) {
-    throw new Error("Twilio credentials are missing");
-}
-
-const twilioClient = twilio(accountSid, authToken);
 
 if (admin.apps.length === 0) {
     admin.initializeApp();
